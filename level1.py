@@ -2,11 +2,11 @@ import json
 import math
 import sys
 
-from Objects.Track import Track
-from Objects.Tyres import Tyres 
-from Objects.Car import Car
-from Objects.Weather import Weather
-from Objects.Race import Race 
+from src.Objects.Track import Track
+from src.Objects.Tyres import Tyres 
+from src.Objects.Car import Car
+from src.Objects.Weather import Weather
+from src.Objects.Race import Race 
 
 class LevelData:
     def __init__(self,car,race,track,tyres,weather):

@@ -163,10 +163,146 @@ def plan_straight(self, straight_length_m, entry_speed_mps, required_exit_speed_
     max_speed= self.level.car.max_speed
     accel_dist_to_max = self._acceleraation_distance(entry_speed_mps,max_speed,self.effective_accel,)
     brake_dist=self._braking_distance(max_speed,required_exit_speed_mps,self.effective_brake,)
+    if accel_dist_to_max + brake_dist <= straight_length_m:
+            return StraightPlan(
+                target_mps=int(math.floor(max_speed)),
+                brake_start_m_before_next=int(math.ceil(brake_dist)),
+            )
+    accel = self.effective_accel
+    brake = self.effective_brake
+    denom = (1.0 / (2.0 * accel)) + (1.0 / (2.0 * brake)) 
+    numer = (
+        straight_length_m
+            + (entry_speed_mps ** 2) / (2.0 * accel)
+            + (required_exit_speed_mps ** 2) / (2.0 * brake)
+        )
+    peak_speed = min(math.sqrt(max(0.0, numer / denom)), max_speed)
 
-    
+    target_speed = int(math.floor(peak_speed))
+    target_speed = max(target_speed, int(math.ceil(required_exit_speed_mps)))
 
-                                               
+    brake_distance = self._braking_distance(
+            float(target_speed),
+            required_exit_speed_mps,
+            self.effective_brake,
+        )
+
+    return StraightPlan(
+            target_mps=target_speed,
+            brake_start_m_before_next=int(math.ceil(brake_distance)),
+        )
+def _build_lap_segments(self, entry_speed_at_lap_start):
+        current_speed = entry_speed_at_lap_start
+        outputs = []
+        index = 0
+        total_segments = len(self.level.track.segments)
+
+        while index < total_segments:
+            segment = self.level.track.segments[index]
+
+            if segment.type == "straight":
+                required_exit_speed = self._next_corner_block_speed(index)
+                straight_plan = self.plan_straight(
+                    straight_length_m=segment.length_m,
+                    entry_speed_mps=current_speed,
+                    required_exit_speed_mps=required_exit_speed,
+                )
+                outputs.append(
+                    {
+                        "id": segment.id,
+                        "type": "straight",
+                        "target_m/s": straight_plan.target_mps,
+                        "brake_start_m_before_next": straight_plan.brake_start_m_before_next,
+                    }
+                )
+                current_speed = required_exit_speed
+                index += 1
+                continue
+
+            if segment.type == "corner":
+                if index == 0 or self.level.track.segments[index - 1].type != "corner":
+                    current_speed = self._corner_block_speed_from(index)
+
+                outputs.append({"id": segment.id, "type": "corner"})
+                index += 1
+                continue
+
+            raise ValueError("Unknown segment type: " + str(segment.type))
+
+        return outputs, current_speed
+
+def _get_start_weather(self):
+        weather_id = self.level.race.start_weather_cond
+        for item in self.level.weather.conditions:
+            if item.id == weather_id:
+                return item
+        raise ValueError("Starting weather id not found: " + str(weather_id))
+def _compute_corner_safe_speeds(self):
+        result = {}
+        for segment in self.level.track.segments:
+            if segment.type == "corner":
+                if segment.radius_m is None:
+                    raise ValueError("Corner segment is missing radius_m: " + str(segment.id))
+                result[segment.id] = self.compute_safe_corner_speed(segment.radius_m)
+        return result
+
+def _corner_block_speed_from(self, start_index):
+        if self.level.track.segments[start_index].type != "corner":
+            raise ValueError("Corner block must start on a corner segment.")
+
+        index = start_index
+        block_speed = float("inf")
+        while index < len(self.level.track.segments) and self.level.track.segments[index].type == "corner":
+            block_speed = min(
+                block_speed,
+                self.corner_safe_speeds[self.level.track.segments[index].id],
+            )
+            index += 1
+        return block_speed
+
+def _next_corner_block_speed(self, straight_index):
+        total_segments = len(self.level.track.segments)
+        for offset in range(1, total_segments + 1):
+            next_index = (straight_index + offset) % total_segments
+            if self.level.track.segments[next_index].type == "corner":
+                return self._corner_block_speed_from(next_index)
+        raise ValueError("No corner found after straight.")
+
+@staticmethod
+def _acceleration_distance(initial_speed_mps, final_speed_mps, accel_mps2):
+        if final_speed_mps <= initial_speed_mps:
+            return 0.0
+        return ((final_speed_mps ** 2) - (initial_speed_mps ** 2)) / (2.0 * accel_mps2)
+
+@staticmethod
+def _braking_distance(initial_speed_mps, final_speed_mps, brake_mps2):
+        if final_speed_mps >= initial_speed_mps:
+            return 0.0
+        return ((initial_speed_mps ** 2) - (final_speed_mps ** 2)) / (2.0 * brake_mps2)
+
+
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: python level1.py <input_json_file> <output_json_file>")
+        return 1
+
+    input_path = sys.argv[1]
+    output_path = sys.argv[2]
+
+    level = LevelData.from_file(input_path)
+    solver = level1(level)
+    result = solver.solve()
+
+    with open(output_path, "w", encoding="utf-8") as handle:
+        json.dump(result, handle, indent=2)
+
+    print("Level 1 output written to " + output_path)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+                                     
     
                 
             

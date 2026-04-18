@@ -15,3 +15,4 @@ class InputOutput:
         with open(self.output_file, 'w') as file:
             for line in data:
                 file.write(line + '\n')
+
